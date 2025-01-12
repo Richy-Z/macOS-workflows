@@ -57,10 +57,10 @@ jobs:
         
         - name: Upload Workflow Files
           run: |
-            for file in *.worlflow; do
+            for file in *.workflow; do
                 if [ -f "$file" ]; then
                     gh release upload ${{ steps.bump_version.outputs.new_version }} "$file"
-                file
+                fi
             done
           env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

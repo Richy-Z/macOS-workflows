@@ -1,66 +1,77 @@
 name: Create Release containing Workflows
 
 on:
-    workflow_dispatch:
-        inputs:
-            release_type:
-                description: 'Release type (major, minor, patch)'
-                required: true
-                default: 'patch'
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type (major, minor, patch)"
+        required: true
+        default: "patch"
 
 jobs:
-    create_release:
-        runs-on: ubuntu-latest
-        steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-        
-        - name: Get latest release
-          id: get_latest_release
-          uses: actions/github-script@v6
-          with:
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            script: |
-              const releases = await github.rest.repos.listReleases({
-                owner: context.repo.owner,
-                repo: context.repo.repo
-              });
-              return releases.data[0]?.tag_name || 'v0.0.0';
-        
-        - name: Bump version
-          id: bump_version
-          run: |
-            current_version="${{ steps.get_latest_release.outputs.result }}"
-            current_version=${current_version#v}
-            IFS='.' read -ra VERSION_PARTS <<< "$current_version"
-            MAJOR=${VERSION_PARTS[0]}
-            MINOR=${VERSION_PARTS[1]}
-            PATCH=${VERSION_PARTS[2]}
-            case "${{ github.event.inputs.release_type }}" in
-                major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
-                minor) MINOR=$((MINOR+1)); PATCH=0 ;;
-                patch) PATCH=$((PATCH+1)) ;;
-            esac
-            new_version="v$MAJOR.$MINOR.$PATCH"
-            echo "new_version=$new_version" >> $GITHUB_OUTPUT
-        
-        - name: Create Release
-          id: create_release
-          uses: actions/create-release@v1
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          with:
-            tag_name: ${{ steps.bump_version.outputs.new_version }}
-            release_name: Release ${{ steps.bump_version.outputs.new_version }}
-            draft: false
-            prerelease: false
-        
-        - name: Upload Workflow Files
-          run: |
-            for file in *.workflow; do
-                if [ -f "$file" ]; then
-                    gh release upload ${{ steps.bump_version.outputs.new_version }} "$file"
-                fi
-            done
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  create_release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get latest release
+        id: get_latest_release
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            return releases.data[0]?.tag_name || 'v0.0.0';
+
+      - name: Bump version
+        id: bump_version
+        run: |
+          current_version="${{ steps.get_latest_release.outputs.result }}"
+          current_version=${current_version#v}
+          IFS='.' read -ra VERSION_PARTS <<< "$current_version"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          case "${{ github.event.inputs.release_type }}" in
+              major) MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR+1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH+1)) ;;
+          esac
+          new_version="v$MAJOR.$MINOR.$PATCH"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.bump_version.outputs.new_version }}
+          release_name: Release ${{ steps.bump_version.outputs.new_version }}
+          draft: false
+          prerelease: false
+
+      - name: Compress (zip) and upload Workflow files
+        run: |
+          for workflow in *.workflow; do
+              if [ -d "$file" ]; then
+                  zip -r "${ workflow }.zip" "$workflow"
+                  gh release upload ${{ steps.bump_version.outputs.new_version }} "${workflow}.zip"
+              fi
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compress (zip) ALL workflows into one final file
+        run: |
+          mkdir workflows_temp
+          cp -R *.workflow workflows_temp/
+          zip -r all_workflows.zip workflows_temp
+
+          gh release upload ${{ steps.bump_version.outputs.new_version }} all_workflows.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

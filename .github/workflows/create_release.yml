@@ -3,10 +3,10 @@ name: Create Release containing Workflows
 on:
     workflow_dispatch:
         inputs:
-                release_type:
-                description: 'Release type (major, minor, patch)'
-                required: true
-                default: 'patch'
+            release_type:
+            description: 'Release type (major, minor, patch)'
+            required: true
+            default: 'patch'
 
 jobs:
     create_release:
